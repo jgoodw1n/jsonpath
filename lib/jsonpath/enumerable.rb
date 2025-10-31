@@ -17,6 +17,25 @@ class JsonPath
       @_current_node = node
       return yield_value(blk, context, key) if pos == @path.size
 
+      # If node is nil and we have default_missing_path_to_null option,
+      # continue processing to potentially yield nil at the end
+      if node.nil? && @options[:default_missing_path_to_null] && pos < @path.size
+        case expr = @path[pos]
+        when '*', '..', '@'
+          each(nil, nil, pos + 1, &blk)
+        when '$'
+          each(nil, nil, pos + 1, &blk)
+        when /^\[(.*)\]$/
+          expr[1, expr.size - 2].split(',').each do |sub_path|
+            case sub_path[0]
+            when '\'', '"'
+              each(nil, nil, pos + 1, &blk)
+            end
+          end
+        end
+        return
+      end
+
       case expr = @path[pos]
       when '*', '..', '@'
         each(context, key, pos + 1, &blk)
@@ -129,9 +148,13 @@ class JsonPath
     def yield_value(blk, context, key)
       case @mode
       when nil
-        blk.call(key ? dig_one(context, key) : context)
+        if context.nil? && @options[:default_missing_path_to_null]
+          blk.call(nil)
+        else
+          blk.call(key ? dig_one(context, key) : context)
+        end
       when :compact
-        if key && context[key].nil?
+        if key && context&.dig(key).nil?
           key.is_a?(Integer) ? context.delete_at(key) : context.delete(key)
         end
       when :delete

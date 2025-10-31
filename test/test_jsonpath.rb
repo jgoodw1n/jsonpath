@@ -895,7 +895,7 @@ class TestJsonpath < MiniTest::Unit::TestCase
     path = "$..book[?((@['author'] == 'Evelyn Waugh' || @['author'] == 'Herman Melville') && (@['price'] == 33 || @['price'] == 9))]"
     assert_equal [@object['store']['book'][2]], JsonPath.new(path).on(@object)
   end
-  
+
   def test_nested_with_unknown_key
     path = "$..[?(@.price == 9 || @.price == 33)].title"
     assert_equal ["Sayings of the Century", "Moby Dick", "Sayings of the Century", "Moby Dick"], JsonPath.new(path).on(@object)
@@ -905,7 +905,7 @@ class TestJsonpath < MiniTest::Unit::TestCase
     path = "$..[?(@['price'] == 9 || @['price'] == 33)].title"
     assert_equal ["Sayings of the Century", "Moby Dick", "Sayings of the Century", "Moby Dick"], JsonPath.new(path).on(@object)
   end
-  
+
   def test_runtime_error_frozen_string
     skip('in ruby version below 2.2.0 this error is not raised') if Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.2.0') || Gem::Version.new(RUBY_VERSION) > Gem::Version::new('2.6')
     json = '
@@ -1317,5 +1317,80 @@ class TestJsonpath < MiniTest::Unit::TestCase
     data = { "store" => { "book" => [{"category" => "reference"}]}}
     assert_equal [{"category": "reference"}],  JsonPath.new('$..book[0]', symbolize_keys: true).on(data)
     assert_equal [{"category": "reference"}],  JsonPath.new('$..book[0]').on(data, symbolize_keys: true)
+  end
+
+  def test_default_missing_path_to_null_with_book_reviews
+    data = { 'store' => {
+      'book' => [
+        { 'category' => 'reference',
+          'author' => 'Nigel Rees',
+          'title' => 'Sayings of the Century',
+          'price' => 9,
+          'review' => nil },
+        { 'category' => 'fiction',
+          'author' => 'Evelyn Waugh',
+          'title' => 'Sword of Honour',
+          'price' => 13,
+          'review' => { 'rating' => 5, 'comment' => 'Excellent!' } },
+        { 'category' => 'fiction',
+          'author' => 'Herman Melville',
+          'title' => 'Moby Dick',
+          'price' => 9 }
+      ]
+    }}
+
+    current_result = JsonPath.new('$..book[*].review.rating', default_path_leaf_to_null: true).on(data)
+    assert_equal [5], current_result
+
+    desired_result = JsonPath.new('$..book[*].review.rating', default_path_leaf_to_null: true, default_missing_path_to_null: true).on(data)
+    assert_equal [nil, 5, nil], desired_result
+  end
+
+  def test_default_missing_path_to_null_multiple_nesting_levels
+    data = { 'store' => {
+      'book' => [
+        { 'title' => 'Book One',
+          'metadata' => nil }, # Null at first level
+        { 'title' => 'Book Two',
+          'metadata' => { 'publication' => nil } }, # Null at second level
+        { 'title' => 'Book Three',
+          'metadata' => {
+            'publication' => {
+              'details' => nil
+            }
+          } }, # Null at third level
+        { 'title' => 'Book Four',
+          'metadata' => {
+            'publication' => {
+              'details' => {
+                'isbn' => '978-0123456789'
+              }
+            }
+          } }
+      ]
+    }}
+
+    result_without = JsonPath.new('$..book[*].metadata.publication.details.isbn').on(data)
+    assert_equal ['978-0123456789'], result_without
+
+    result_with = JsonPath.new('$..book[*].metadata.publication.details.isbn', default_missing_path_to_null: true).on(data)
+    assert_equal [nil, nil, nil, '978-0123456789'], result_with
+  end
+
+  def test_default_missing_path_to_null_preserves_normal_behavior
+    result_without = JsonPath.new('$..book[*].author').on(@object)
+    result_with = JsonPath.new('$..book[*].author', default_missing_path_to_null: true).on(@object)
+
+    expected = ['Nigel Rees', 'Evelyn Waugh', 'Herman Melville', 'J. R. R. Tolkien', 'Lukyanenko', 'Lukyanenko', 'Lukyanenko']
+    assert_equal expected, result_without
+    assert_equal expected, result_with
+  end
+
+  def test_default_missing_path_to_null_shows_difference_with_missing_fields
+    result_without = JsonPath.new('$..book[*].price').on(@object)
+    result_with = JsonPath.new('$..book[*].price', default_missing_path_to_null: true).on(@object)
+
+    assert_equal [9, 13, 9, 23], result_without
+    assert_equal [9, 13, 9, 23, nil, nil, nil], result_with
   end
 end

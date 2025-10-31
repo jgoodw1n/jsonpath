@@ -16,6 +16,7 @@ class JsonPath
 
   DEFAULT_OPTIONS = {
     :default_path_leaf_to_null => false,
+    :default_missing_path_to_null => false,
     :symbolize_keys => false,
     :use_symbols => false,
     :allow_send => true,
