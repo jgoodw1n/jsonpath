@@ -1393,4 +1393,26 @@ class TestJsonpath < MiniTest::Unit::TestCase
     assert_equal [9, 13, 9, 23], result_without
     assert_equal [9, 13, 9, 23, nil, nil, nil], result_with
   end
+
+  def test_default_missing_path_to_null_avoids_recursive_descent
+    data = { 'store' => {
+      'book' => [
+        { 'title' => 'The Hobbit',
+          'category' => 'fantasy'
+        },
+        { 'title' => 'The Great Gatsby',
+          'category' => 'classic',
+          'metadata' => { 'isbn' => '978-0743273565' }
+        }
+      ]
+    }}
+
+    path = '$.store.book[*].metadata.isbn'
+
+    result_without = JsonPath.new(path).on(data)
+    assert_equal ['978-0743273565'], result_without
+
+    result_with = JsonPath.new(path, default_missing_path_to_null: true).on(data)
+    assert_equal [nil, '978-0743273565'], result_with
+  end
 end
