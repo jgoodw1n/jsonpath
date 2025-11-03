@@ -1415,4 +1415,21 @@ class TestJsonpath < MiniTest::Unit::TestCase
     result_with = JsonPath.new(path, default_missing_path_to_null: true).on(data)
     assert_equal [nil, '978-0743273565'], result_with
   end
+
+  def test_default_missing_path_to_null_with_array_index_access
+    data = [
+      { 'title' => 'Sayings of the Century',
+        'reviews' => [{ 'rating' => 5 }] },
+      { 'title' => 'Sword of Honour',
+        'reviews' => [{ 'rating' => 4 }, { 'rating' => 3 }] },
+      { 'title' => 'Moby Dick',
+        'reviews' => [{ 'rating' => 5 }] }
+    ]
+
+    result_without = JsonPath.new('$[*].reviews[1].rating').on(data)
+    assert_equal [3], result_without
+
+    result_with = JsonPath.new('$[*].reviews[1].rating', default_missing_path_to_null: true).on(data)
+    assert_equal [nil, 3, nil], result_with
+  end
 end

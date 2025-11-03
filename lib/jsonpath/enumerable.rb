@@ -20,10 +20,12 @@ class JsonPath
       # If node is nil and we have default_missing_path_to_null option,
       # continue processing to potentially yield nil at the end
       if node.nil? && @options[:default_missing_path_to_null] && pos < @path.size
-        # Skip nil continuation during recursive descent
         # Check if context already has the target key from current path element
+        #   to avoid duplicating nils in recursive descent
         expr = @path[pos]
-        return if expr =~ /^\['(.*)'\]$/ && context.is_a?(Hash) && context.key?($1)
+        if expr =~ /^\['(.*)'\]$/ && context.is_a?(Hash) && context.key?(::Regexp.last_match(1))
+          return
+        end
 
         case expr
         when '*', '..', '@'
@@ -101,7 +103,10 @@ class JsonPath
           elsif sub_path.count(':') == 0
             start_idx = end_idx = process_function_or_literal(array_args[0], 0)
             next unless start_idx
-            next if start_idx >= node.size
+            if start_idx >= node.size
+              each(nil, nil, pos + 1, &blk) if @options[:default_missing_path_to_null]
+              next
+            end
           else
             start_idx = process_function_or_literal(array_args[0], 0)
             next unless start_idx
