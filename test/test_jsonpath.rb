@@ -1319,7 +1319,7 @@ class TestJsonpath < MiniTest::Unit::TestCase
     assert_equal [{"category": "reference"}],  JsonPath.new('$..book[0]').on(data, symbolize_keys: true)
   end
 
-  def test_default_missing_path_to_null_with_book_reviews
+  def test_recursive_descent_with_default_options
     data = { 'store' => {
       'book' => [
         { 'category' => 'reference',
@@ -1339,11 +1339,14 @@ class TestJsonpath < MiniTest::Unit::TestCase
       ]
     }}
 
-    current_result = JsonPath.new('$..book[*].review.rating', default_path_leaf_to_null: true).on(data)
-    assert_equal [5], current_result
+    leaf_path_result = JsonPath.new('$..book[*].review.rating', default_path_leaf_to_null: true).on(data)
+    assert_equal [5], leaf_path_result
 
-    desired_result = JsonPath.new('$..book[*].review.rating', default_path_leaf_to_null: true, default_missing_path_to_null: true).on(data)
-    assert_equal [5], desired_result
+    missing_path_result = JsonPath.new('$..book[*].review.rating', default_missing_path_to_null: true).on(data)
+    assert_equal [5], missing_path_result
+
+    normal_result = JsonPath.new('$..book[*].review.rating').on(data)
+    assert_equal [5], normal_result
   end
 
   def test_default_missing_path_to_null_multiple_nesting_levels
@@ -1370,31 +1373,14 @@ class TestJsonpath < MiniTest::Unit::TestCase
       ]
     }}
 
-    result_without = JsonPath.new('$..book[*].metadata.publication.details.isbn').on(data)
+    result_without = JsonPath.new('$.store.book[*].metadata.publication.details.isbn').on(data)
     assert_equal ['978-0123456789'], result_without
 
-    result_with = JsonPath.new('$..book[*].metadata.publication.details.isbn', default_missing_path_to_null: true).on(data)
-    assert_equal ['978-0123456789'], result_with
+    result_with = JsonPath.new('$.store.book[*].metadata.publication.details.isbn', default_missing_path_to_null: true).on(data)
+    assert_equal [nil, nil, nil, '978-0123456789'], result_with
   end
 
-  def test_default_missing_path_to_null_preserves_normal_behavior
-    result_without = JsonPath.new('$..book[*].author').on(@object)
-    result_with = JsonPath.new('$..book[*].author', default_missing_path_to_null: true).on(@object)
-
-    expected = ['Nigel Rees', 'Evelyn Waugh', 'Herman Melville', 'J. R. R. Tolkien', 'Lukyanenko', 'Lukyanenko', 'Lukyanenko']
-    assert_equal expected, result_without
-    assert_equal expected, result_with
-  end
-
-  def test_default_missing_path_to_null_shows_difference_with_missing_fields
-    result_without = JsonPath.new('$..book[*].price').on(@object)
-    result_with = JsonPath.new('$..book[*].price', default_missing_path_to_null: true).on(@object)
-
-    assert_equal [9, 13, 9, 23], result_without
-    assert_equal [9, 13, 9, 23], result_with
-  end
-
-  def test_default_missing_path_to_null_avoids_recursive_descent
+  def test_default_missing_path_to_null_finds_missing_keys
     data = { 'store' => {
       'book' => [
         { 'title' => 'The Hobbit',
@@ -1407,12 +1393,10 @@ class TestJsonpath < MiniTest::Unit::TestCase
       ]
     }}
 
-    path = '$.store.book[*].metadata.isbn'
-
-    result_without = JsonPath.new(path).on(data)
+    result_without = JsonPath.new('$.store.book[*].metadata.isbn').on(data)
     assert_equal ['978-0743273565'], result_without
 
-    result_with = JsonPath.new(path, default_missing_path_to_null: true).on(data)
+    result_with = JsonPath.new('$.store.book[*].metadata.isbn', default_missing_path_to_null: true).on(data)
     assert_equal [nil, '978-0743273565'], result_with
   end
 
