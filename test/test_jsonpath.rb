@@ -1343,7 +1343,7 @@ class TestJsonpath < MiniTest::Unit::TestCase
     assert_equal [5], current_result
 
     desired_result = JsonPath.new('$..book[*].review.rating', default_path_leaf_to_null: true, default_missing_path_to_null: true).on(data)
-    assert_equal [nil, 5, nil], desired_result
+    assert_equal [5], desired_result
   end
 
   def test_default_missing_path_to_null_multiple_nesting_levels
@@ -1374,7 +1374,7 @@ class TestJsonpath < MiniTest::Unit::TestCase
     assert_equal ['978-0123456789'], result_without
 
     result_with = JsonPath.new('$..book[*].metadata.publication.details.isbn', default_missing_path_to_null: true).on(data)
-    assert_equal [nil, nil, nil, '978-0123456789'], result_with
+    assert_equal ['978-0123456789'], result_with
   end
 
   def test_default_missing_path_to_null_preserves_normal_behavior
@@ -1391,7 +1391,7 @@ class TestJsonpath < MiniTest::Unit::TestCase
     result_with = JsonPath.new('$..book[*].price', default_missing_path_to_null: true).on(@object)
 
     assert_equal [9, 13, 9, 23], result_without
-    assert_equal [9, 13, 9, 23, nil, nil, nil], result_with
+    assert_equal [9, 13, 9, 23], result_with
   end
 
   def test_default_missing_path_to_null_avoids_recursive_descent
@@ -1431,5 +1431,40 @@ class TestJsonpath < MiniTest::Unit::TestCase
 
     result_with = JsonPath.new('$[*].reviews[1].rating', default_missing_path_to_null: true).on(data)
     assert_equal [nil, 3, nil], result_with
+  end
+
+  def test_default_missing_path_to_null_avoids_key_collision
+    data = [
+      { 'title' => 'Book One', 'author' => nil },
+      { 'title' => 'Book Two', 'author' => nil },
+      { 'title' => 'Book Three', 'author' => { 'name' => 'Jane Doe', 'title' => 'Dr.' } }
+    ]
+    result_without = JsonPath.new('$[*].author.name', default_missing_path_to_null: true).on(data)
+    assert_equal [nil, nil, 'Jane Doe'], result_without
+
+    result_title = JsonPath.new('$[*].author.title', default_missing_path_to_null: true).on(data)
+    assert_equal [nil, nil, 'Dr.'], result_title
+  end
+
+  def test_default_missing_path_to_null_with_recursive_descent
+    data = {
+      'library' => {
+        'name' => 'Central Library',
+        'books' => [
+          { 'title' => 'Book One', 'author' => nil },
+          { 'title' => 'Book Two', 'author' => { 'name' => 'Jane Smith' } },
+          { 'title' => 'Book Three' }
+        ],
+        'magazines' => [
+          { 'title' => 'Mag One', 'author' => { 'name' => 'Bob Jones' } }
+        ]
+      }
+    }
+
+    result_without = JsonPath.new('$..author.name').on(data)
+    assert_equal ['Jane Smith', 'Bob Jones'], result_without
+
+    result_with = JsonPath.new('$..author.name', default_missing_path_to_null: true).on(data)
+    assert_equal ['Jane Smith', 'Bob Jones'], result_with
   end
 end
